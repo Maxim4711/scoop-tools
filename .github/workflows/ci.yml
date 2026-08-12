@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths: ['bucket/**']
+  pull_request:
+    paths: ['bucket/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate manifests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Scoop
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+          Invoke-RestMethod get.scoop.sh -OutFile "$env:RUNNER_TEMP\install.ps1"
+          & "$env:RUNNER_TEMP\install.ps1" -RunAsAdmin
+          "$env:USERPROFILE\scoop\shims" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: JSON is well-formed
+        shell: pwsh
+        run: |
+          $bad = 0
+          Get-ChildItem bucket -Filter '*.json' | ForEach-Object {
+              try { $null = Get-Content $_.FullName -Raw | ConvertFrom-Json }
+              catch { Write-Host "::error file=bucket/$($_.Name)::invalid JSON - $_"; $bad++ }
+          }
+          if ($bad) { exit 1 }
+
+      - name: Canonical formatting
+        shell: pwsh
+        run: |
+          & "$env:USERPROFILE\scoop\apps\scoop\current\bin\formatjson.ps1" -Dir "$env:GITHUB_WORKSPACE\bucket"
+          git diff --exit-code -- bucket
+          if ($LASTEXITCODE -ne 0) {
+              Write-Host '::error::manifests are not in Scoop canonical format - run bin/formatjson.ps1 locally'
+              exit 1
+          }
+
+      - name: Download URLs are alive
+        shell: pwsh
+        env:
+          SCOOP_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          & "$env:USERPROFILE\scoop\apps\scoop\current\bin\checkurls.ps1" -Dir "$env:GITHUB_WORKSPACE\bucket"
+
+  hashes:
+    name: Verify hashes
+    # Downloads every artefact (~75 MB), so keep it off the per-push path.
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Scoop
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+          Invoke-RestMethod get.scoop.sh -OutFile "$env:RUNNER_TEMP\install.ps1"
+          & "$env:RUNNER_TEMP\install.ps1" -RunAsAdmin
+          "$env:USERPROFILE\scoop\shims" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: checkhashes
+        shell: pwsh
+        env:
+          SCOOP_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          & "$env:USERPROFILE\scoop\apps\scoop\current\bin\checkhashes.ps1" -Dir "$env:GITHUB_WORKSPACE\bucket"

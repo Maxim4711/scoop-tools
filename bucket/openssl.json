@@ -1,0 +1,77 @@
+{
+    "version": "3.5.7",
+    "description": "TLS/SSL toolkit. Pinned to the 3.5 LTS series - only 3.5.x security/patch releases are ever picked up.",
+    "homepage": "https://slproweb.com/products/Win32OpenSSL.html",
+    "license": "Apache-2.0",
+    "notes": [
+        "This manifest is deliberately pinned to the OpenSSL 3.5 LTS series (supported until 2030-04-08).",
+        "Excavator will move 3.5.7 -> 3.5.8 -> ... but will never jump to 3.6.x or 4.x.",
+        "To move to a different series you must edit checkver.script in this manifest on purpose.",
+        "",
+        "Import libraries live under lib\\VC\\<arch>\\MD (dynamic CRT) and lib\\VC\\<arch>\\MT (static CRT).",
+        "lib\\ contains hardlinks to the MT variant for CMake's FindOpenSSL.",
+        "Link MSVC /MD consumers (e.g. Lua C modules) against lib\\VC\\x64\\MD explicitly."
+    ],
+    "architecture": {
+        "64bit": {
+            "url": "https://slproweb.com/download/Win64OpenSSL-3_5_7.exe",
+            "hash": "c4e8ba59232ab56de5b86c063f34dbb5d4cb477833154c17a375d759d6cd3473"
+        },
+        "32bit": {
+            "url": "https://slproweb.com/download/Win32OpenSSL-3_5_7.exe",
+            "hash": "fb20b3b6ca0954b174a28fb7eecc80631c036824810a16f4eb4bc65b2309f480"
+        },
+        "arm64": {
+            "url": "https://slproweb.com/download/Win64ARMOpenSSL-3_5_7.exe",
+            "hash": "7e05f7e83f4c183664a7d2b7405524edfceee790cb60f98bfe6307dae36182cc"
+        }
+    },
+    "innosetup": true,
+    "pre_install": [
+        "$arch = switch ($architecture) {",
+        "    '64bit' { 'x64'; break }",
+        "    '32bit' { 'x86'; break }",
+        "    'arm64' { $architecture; break }",
+        "}",
+        "$null = Get-ChildItem \"$dir/lib/VC/$arch/MT\" | ForEach-Object { New-Item -Force -ItemType HardLink -Target $_.FullName -Path \"$dir/lib/$($_.Name)\" }"
+    ],
+    "env_add_path": "bin",
+    "env_set": {
+        "OPENSSL_ROOT_DIR": "$dir",
+        "OPENSSL_LIB_DIR": "$dir\\lib",
+        "OPENSSL_INCLUDE_DIR": "$dir\\include",
+        "OPENSSL_MODULES": "$dir\\bin",
+        "OPENSSL_CONF": "$dir\\bin\\cnf\\openssl.cnf"
+    },
+    "checkver": {
+        "script": [
+            "$series = '3.5.'",
+            "$feed = 'https://raw.githubusercontent.com/slproweb/opensslhashes/master/win32_openssl_hashes.json'",
+            "$json = Invoke-RestMethod -Uri $feed",
+            "$json.files.PSObject.Properties |",
+            "    Where-Object { $_.Name -like 'Win64OpenSSL-*.exe' -and $_.Value.basever -like \"$series*\" } |",
+            "    ForEach-Object { [version]$_.Value.basever } |",
+            "    Sort-Object -Descending |",
+            "    Select-Object -First 1 |",
+            "    ForEach-Object { $_.ToString() }"
+        ],
+        "regex": "([\\d.]+)"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://slproweb.com/download/Win64OpenSSL-$underscoreVersion.exe"
+            },
+            "32bit": {
+                "url": "https://slproweb.com/download/Win32OpenSSL-$underscoreVersion.exe"
+            },
+            "arm64": {
+                "url": "https://slproweb.com/download/Win64ARMOpenSSL-$underscoreVersion.exe"
+            }
+        },
+        "hash": {
+            "url": "https://raw.githubusercontent.com/slproweb/opensslhashes/master/win32_openssl_hashes.json",
+            "jsonpath": "$.files.['$basename'].sha256"
+        }
+    }
+}

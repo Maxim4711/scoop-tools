@@ -1,0 +1,70 @@
+name: Excavator
+
+# Keeps the manifests current: runs Scoop's own checkver/autoupdate over bucket/
+# and commits any version+hash bumps it finds.
+#
+# openssl is pinned to the 3.5 LTS series by its own checkver script, so this
+# workflow will bump 3.5.7 -> 3.5.8 (security/patch releases) but will never
+# move it to 3.6.x or 4.x. That pin lives in bucket/openssl.json, not here.
+
+on:
+  schedule:
+    # daily, 05:23 UTC - off the hour to avoid the GitHub cron stampede
+    - cron: '23 5 * * *'
+  workflow_dispatch:
+    inputs:
+      app:
+        description: 'Manifest to check ("*" for all)'
+        required: false
+        default: '*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: excavator
+  cancel-in-progress: false
+
+jobs:
+  excavate:
+    name: Check for updates
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Scoop
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+          Invoke-RestMethod get.scoop.sh -OutFile "$env:RUNNER_TEMP\install.ps1"
+          & "$env:RUNNER_TEMP\install.ps1" -RunAsAdmin
+          "$env:USERPROFILE\scoop\shims" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
+      - name: Run checkver -Update
+        shell: pwsh
+        env:
+          # picked up by scoop's Get-GitHubToken; raises the API rate limit for
+          # the two manifests that use "checkver": { "github": ... }
+          SCOOP_GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $app = '${{ github.event.inputs.app }}'
+          if (-not $app) { $app = '*' }
+          & "$env:USERPROFILE\scoop\apps\scoop\current\bin\checkver.ps1" `
+              -App $app -Dir "$env:GITHUB_WORKSPACE\bucket" -Update
+
+      - name: Commit and push
+        shell: pwsh
+        run: |
+          if (-not (git status --porcelain -- bucket)) {
+              Write-Host 'No manifest changes.'
+              exit 0
+          }
+          $apps = git diff --name-only -- bucket |
+              ForEach-Object { [IO.Path]::GetFileNameWithoutExtension($_) } |
+              Sort-Object -Unique
+          git status --short -- bucket
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add bucket
+          git commit -m "excavator: update $($apps -join ', ')"
+          git push

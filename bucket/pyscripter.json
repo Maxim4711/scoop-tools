@@ -1,0 +1,44 @@
+{
+    "version": "5.3.1",
+    "description": "Open-source Python IDE for Windows",
+    "homepage": "https://github.com/pyscripter/pyscripter",
+    "license": "MIT",
+    "notes": [
+        "PyScripter needs a Python installation to drive; `scoop install python` provides one.",
+        "PyScripter.ini is persisted, so settings survive updates."
+    ],
+    "architecture": {
+        "64bit": {
+            "url": "https://downloads.sourceforge.net/project/pyscripter/PyScripter-v5.3/PyScripter-5.3.1-x64.zip",
+            "hash": "d71453a8da8eab641ccc78e219a51308799c9b25889f850e9d31627c822051f4",
+            "extract_dir": "PyScripter"
+        },
+        "32bit": {
+            "url": "https://downloads.sourceforge.net/project/pyscripter/PyScripter-v5.3/PyScripter-5.3.1-x86.zip",
+            "hash": "88074e2613ea5b6fc48efb46c7bab5c099e47b3dce27f4b83352420d9cca10a6",
+            "extract_dir": "PyScripter"
+        }
+    },
+    "bin": "PyScripter.exe",
+    "shortcuts": [
+        [
+            "PyScripter.exe",
+            "PyScripter"
+        ]
+    ],
+    "persist": "PyScripter.ini",
+    "checkver": {
+        "url": "https://sourceforge.net/projects/pyscripter/files/",
+        "regex": "/PyScripter-v[\\d.]+/PyScripter-([\\d.]+)-x64-Setup\\.exe"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://downloads.sourceforge.net/project/pyscripter/PyScripter-v$majorVersion.$minorVersion/PyScripter-$version-x64.zip"
+            },
+            "32bit": {
+                "url": "https://downloads.sourceforge.net/project/pyscripter/PyScripter-v$majorVersion.$minorVersion/PyScripter-$version-x86.zip"
+            }
+        }
+    }
+}

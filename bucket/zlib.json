@@ -1,0 +1,68 @@
+{
+    "version": "1.3.2",
+    "description": "zlib compression library - built from source with MSVC. Ships shared + static libs and a luarocks-compatible static prefix.",
+    "homepage": "https://zlib.net/",
+    "license": "Zlib",
+    "notes": [
+        "Built from source at install time: needs CMake (pulled in as a dependency) and MSVC (Visual Studio Build Tools with the VCTools workload).",
+        "",
+        "Layout:",
+        "  bin\\z.dll            shared runtime      (1.3.2 renamed this from zlib.dll)",
+        "  lib\\z.lib            IMPORT library for z.dll",
+        "  lib\\zs.lib           the real static library",
+        "  include\\zlib.h, zconf.h",
+        "  static\\lib\\zlib.lib copy of zs.lib under the name LuaRocks/autotools ask for",
+        "  static\\include\\     copy of the headers",
+        "",
+        "Point CMake at the prefix itself (ZLIB_ROOT=<dir>).",
+        "Point LuaRocks at the static view (ZLIB_DIR=<dir>\\static) - that links the static",
+        "library and needs no runtime DLL, which is what lua-zlib and zipwriter want."
+    ],
+    "url": "https://github.com/madler/zlib/releases/download/v1.3.2/zlib132.zip",
+    "hash": "e8bf55f3017aa181690990cb58a994e77885da140609fc8f94abe9b65d2cae28",
+    "extract_dir": "zlib-1.3.2",
+    "extract_to": "src",
+    "depends": "main/cmake",
+    "installer": {
+        "script": [
+            "$plat = switch ($architecture) {",
+            "    '64bit' { 'x64'; break }",
+            "    '32bit' { 'Win32'; break }",
+            "    'arm64' { 'ARM64'; break }",
+            "}",
+            "$src = \"$dir\\src\"",
+            "$bld = \"$src\\build\"",
+            "",
+            "Write-Host '  Configuring zlib with CMake...' -ForegroundColor DarkGray",
+            "cmake -S \"$src\" -B \"$bld\" -A $plat -DCMAKE_INSTALL_PREFIX=\"$dir\" -DZLIB_BUILD_TESTING=OFF | Out-Null",
+            "if ($LASTEXITCODE -ne 0) { abort \"zlib: CMake configure failed. Is a Visual Studio C++ toolset installed?\" }",
+            "",
+            "Write-Host '  Compiling zlib (Release)...' -ForegroundColor DarkGray",
+            "cmake --build \"$bld\" --config Release --target install | Out-Null",
+            "if ($LASTEXITCODE -ne 0) { abort 'zlib: build failed.' }",
+            "",
+            "if (!(Test-Path \"$dir\\lib\\zs.lib\")) { abort 'zlib: expected lib\\zs.lib (static) was not produced.' }",
+            "",
+            "# Static view: expose the static library under the name LuaRocks asks for.",
+            "# Deliberately NOT placed in lib\\ - putting an import library called zlib.lib",
+            "# next to a static one is exactly how you end up linking the wrong thing.",
+            "New-Item -ItemType Directory -Force \"$dir\\static\\lib\" | Out-Null",
+            "New-Item -ItemType Directory -Force \"$dir\\static\\include\" | Out-Null",
+            "Copy-Item \"$dir\\include\\*.h\" \"$dir\\static\\include\\\" -Force",
+            "Copy-Item \"$dir\\lib\\zs.lib\" \"$dir\\static\\lib\\zlib.lib\" -Force",
+            "",
+            "Remove-Item \"$src\" -Recurse -Force -ErrorAction SilentlyContinue"
+        ]
+    },
+    "env_add_path": "bin",
+    "env_set": {
+        "ZLIB_ROOT": "$dir"
+    },
+    "checkver": {
+        "github": "https://github.com/madler/zlib"
+    },
+    "autoupdate": {
+        "url": "https://github.com/madler/zlib/releases/download/v$version/zlib$cleanVersion.zip",
+        "extract_dir": "zlib-$version"
+    }
+}

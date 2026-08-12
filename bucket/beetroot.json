@@ -1,0 +1,53 @@
+{
+    "version": "1.6.6",
+    "description": "Lightweight clipboard manager for Windows with AI-powered text transforms",
+    "homepage": "https://github.com/mnardit/beetroot-releases",
+    "license": "Proprietary",
+    "notes": [
+        "Installed from the MSI payload, so this is a genuine portable install under the Scoop",
+        "apps directory - the vendor's NSIS setup is never executed and nothing lands in",
+        "%ProgramFiles%, no elevation is required.",
+        "",
+        "Beetroot keeps its database and settings in %APPDATA%\\Beetroot (outside Scoop's",
+        "control): they survive updates, and `scoop uninstall` leaves them behind on purpose.",
+        "Remove that folder by hand if you want a clean slate."
+    ],
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/mnardit/beetroot-releases/releases/download/v1.6.6/Beetroot_1.6.6_x64_en-US.msi",
+            "hash": "a840e690b3d3647641de5bdd694f6a8e77a61f3deeae25798818a6a49969e604",
+            "extract_dir": "PFiles\\Beetroot"
+        }
+    },
+    "bin": "beetroot.exe",
+    "shortcuts": [
+        [
+            "beetroot.exe",
+            "Beetroot"
+        ]
+    ],
+    "pre_uninstall": [
+        "# A running clipboard manager holds beetroot.exe open; without this both",
+        "# `scoop update` and `scoop uninstall` fail with a file-in-use error.",
+        "Get-Process -Name 'beetroot' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue",
+        "Start-Sleep -Milliseconds 500",
+        "if ($cmd -eq 'uninstall') {",
+        "    # Beetroot registers itself for autostart at runtime - drop the entry so an",
+        "    # uninstalled app does not leave a dangling Run value behind.",
+        "    Remove-ItemProperty -Path 'HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run' -Name 'Beetroot' -ErrorAction SilentlyContinue",
+        "    if (is_admin) {",
+        "        Remove-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run' -Name 'Beetroot' -ErrorAction SilentlyContinue",
+        "    }",
+        "}"
+    ],
+    "checkver": {
+        "github": "https://github.com/mnardit/beetroot-releases"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/mnardit/beetroot-releases/releases/download/v$version/Beetroot_$version_x64_en-US.msi"
+            }
+        }
+    }
+}
