@@ -16,7 +16,7 @@ afterwards stays on this bucket by itself.
 | app | version | why it is here |
 |---|---|---|
 | `openssl` | 3.5.7 | `main` tracks the newest series (4.x). This one is **pinned to the 3.5 LTS series**. |
-| `zlib` | 1.3.2 | `extras` ships a **32-bit 1.2.12** binary from 2022. This builds 1.3.2 from source with MSVC. |
+| `zlib` | 1.3.2 | `extras` ships a **32-bit 1.2.12** binary from 2022. This ships 1.3.2 built with MSVC in CI. |
 | `pyscripter` | 5.3.1 | Same upstream as `scoop-apps`, with a fixed download host and persisted settings. |
 | `beetroot` | 1.6.6 | The vendor's manifest runs an NSIS setup that installs into `%ProgramFiles%`. This one is a real portable install. |
 
@@ -56,12 +56,29 @@ Import libraries are under `lib\VC\<arch>\MD` (dynamic CRT) and `lib\VC\<arch>\M
 (static CRT); `lib\` holds hardlinks to the MT set so CMake's `FindOpenSSL` works.
 Link `/MD` consumers against `lib\VC\x64\MD` explicitly.
 
-## zlib — built from source
+## zlib — built in CI, shipped as a binary
 
 There is no official Windows binary for zlib, which is why `extras/zlib` is stuck
-on a 32-bit vc14.2 build of 1.2.12. This manifest downloads the 1.3.2 source and
-builds it with CMake + MSVC at install time (hence `depends: main/cmake`, plus
-Visual Studio Build Tools with the VCTools workload).
+on a 32-bit vc14.2 build of 1.2.12. This bucket builds it instead —
+**once, on a GitHub runner** — and ships the result as a release asset. Installing
+it is an ordinary download: no CMake, no MSVC, no toolchain of any kind.
+
+`.github/workflows/build-zlib.yml` compiles x64 and x86 from the official source
+release, publishes them under a `zlib-<version>` tag, and rewrites
+`bucket/zlib.json` to point at those assets with their hashes. The workflow is
+the only writer of that manifest, which is why `zlib.json` carries **no
+`checkver`/`autoupdate`** — `checkver.ps1` only queues manifests that declare
+one, so excavator skips zlib and the two jobs cannot race over the same file.
+
+> An earlier revision compiled at install time from the manifest's own
+> `installer.script`. That is a bad bargain for a *library download*: it puts
+> CMake and a full MSVC C++ toolset in the dependency chain of every consumer.
+> It also breaks on real machines — a Visual Studio install carrying MSBuild but
+> no C++ workload cannot resolve `VCTargetsPath`, and CMake reports nothing more
+> useful than `Failed to run MSBuild command … unknown error`.
+
+Only `x64` and `x86` are published; the source-build revision would compile for
+whatever architecture Scoop picked, so `arm64` is a deliberate drop.
 
 **1.3.2 renamed its Windows outputs** — worth knowing if you are migrating:
 
@@ -117,7 +134,11 @@ survives updates and is intentionally left behind on uninstall.
 
 * **`.github/workflows/excavator.yml`** — daily; runs Scoop's `checkver.ps1 -Update`
   over `bucket/` and commits version + hash bumps. Also runnable on demand for a
-  single app via *Run workflow*.
+  single app via *Run workflow*. Covers `openssl`, `pyscripter` and `beetroot`.
+* **`.github/workflows/build-zlib.yml`** — weekly and on demand; builds zlib,
+  publishes the release, and updates `bucket/zlib.json` itself. Takes an optional
+  `version` (blank = latest upstream) and a `force` flag to rebuild an existing
+  release.
 * **`.github/workflows/ci.yml`** — on push/PR: JSON well-formedness, Scoop
   canonical formatting (`formatjson.ps1`), and liveness of every download URL.
   Full hash verification runs on PRs and on demand, since it downloads everything.
