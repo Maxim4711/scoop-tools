@@ -1,5 +1,5 @@
 {
-    "version": "3.5.6",
+    "version": "3.5.7",
     "description": "TLS/SSL toolkit. Pinned to the 3.5 LTS series - only 3.5.x security/patch releases are ever picked up.",
     "homepage": "https://slproweb.com/products/Win32OpenSSL.html",
     "license": "Apache-2.0",
