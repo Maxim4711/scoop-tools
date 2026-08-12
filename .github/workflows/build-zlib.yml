@@ -1,0 +1,196 @@
+name: Build zlib
+
+# zlib publishes source only - there is no official Windows binary. Rather than
+# compile on every machine that installs this bucket (which would put CMake and
+# a full MSVC C++ toolset in the dependency chain of a *library download*), the
+# build happens here once and the result ships as a release asset.
+#
+# This workflow owns bucket/zlib.json end to end: it builds, publishes the
+# release, and rewrites the manifest to point at it. That is why zlib.json
+# carries no "checkver"/"autoupdate" - excavator deliberately skips it, so the
+# two cannot race each other over the same file.
+
+on:
+  schedule:
+    # weekly; zlib releases are rare
+    - cron: '41 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'zlib version to build (blank = latest release of madler/zlib)'
+        required: false
+        default: ''
+      force:
+        description: 'Rebuild and re-upload even if the release already exists'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-zlib
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and publish
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Resolve version
+        id: ver
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ver = '${{ github.event.inputs.version }}'
+          if (-not $ver) {
+              $ver = (gh api repos/madler/zlib/releases/latest --jq .tag_name).TrimStart('v')
+          }
+          if ($ver -notmatch '^\d+\.\d+(\.\d+)?$') { throw "unexpected zlib version '$ver'" }
+          $current = (Get-Content bucket/zlib.json -Raw | ConvertFrom-Json).version
+          $force   = '${{ github.event.inputs.force }}' -eq 'true'
+
+          # Probe for an existing release. gh exits non-zero when the tag is
+          # absent, which is expected here - reset LASTEXITCODE afterwards or the
+          # pwsh shell fails the step on it.
+          gh release view "zlib-$ver" --json tagName > $null 2>&1
+          $exists = $LASTEXITCODE -eq 0
+          $global:LASTEXITCODE = 0
+
+          "version=$ver"                >> $env:GITHUB_OUTPUT
+          "compact=$($ver -replace '\.','')" >> $env:GITHUB_OUTPUT
+          "skip=$((-not $force) -and $exists -and ($current -eq $ver))" >> $env:GITHUB_OUTPUT
+          Write-Host "zlib upstream=$ver  manifest=$current  release exists=$exists  force=$force"
+
+      - name: Download source
+        if: steps.ver.outputs.skip != 'True'
+        shell: pwsh
+        run: |
+          $v = '${{ steps.ver.outputs.version }}'
+          $c = '${{ steps.ver.outputs.compact }}'
+          Invoke-WebRequest "https://github.com/madler/zlib/releases/download/v$v/zlib$c.zip" -OutFile src.zip
+          Expand-Archive src.zip -DestinationPath src -Force
+          if (-not (Test-Path "src/zlib-$v/CMakeLists.txt")) { throw "unexpected source layout in zlib$c.zip" }
+
+      - name: Build
+        if: steps.ver.outputs.skip != 'True'
+        shell: pwsh
+        run: |
+          $v = '${{ steps.ver.outputs.version }}'
+          foreach ($a in @(@{ name = 'x64'; plat = 'x64' }, @{ name = 'x86'; plat = 'Win32' })) {
+              $pfx = "$PWD\prefix-$($a.name)"
+              cmake -S "src/zlib-$v" -B "build-$($a.name)" -A $a.plat `
+                    -DCMAKE_INSTALL_PREFIX="$pfx" -DZLIB_BUILD_TESTING=OFF
+              if ($LASTEXITCODE -ne 0) { throw "cmake configure failed for $($a.name)" }
+              cmake --build "build-$($a.name)" --config Release --target install
+              if ($LASTEXITCODE -ne 0) { throw "build failed for $($a.name)" }
+
+              # Static view: LuaRocks (and autotools-flavoured build systems) look
+              # for a file literally named zlib.lib. Since 1.3.2 the static library
+              # is called zs.lib, so expose a copy under the expected name - kept
+              # out of lib\ so an import library and a static library never share
+              # the name zlib.lib in one directory.
+              if (-not (Test-Path "$pfx\lib\zs.lib")) { throw "expected lib\zs.lib (static) for $($a.name)" }
+              New-Item -ItemType Directory -Force "$pfx\static\lib", "$pfx\static\include" | Out-Null
+              Copy-Item "$pfx\include\*.h" "$pfx\static\include\" -Force
+              Copy-Item "$pfx\lib\zs.lib"  "$pfx\static\lib\zlib.lib" -Force
+
+              Compress-Archive -Path "$pfx\*" -DestinationPath "$PWD\zlib-$v-$($a.name)-msvc.zip" -Force
+          }
+          Get-ChildItem zlib-*-msvc.zip | Select-Object Name, Length
+
+      - name: Publish release
+        if: steps.ver.outputs.skip != 'True'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $v   = '${{ steps.ver.outputs.version }}'
+          $tag = "zlib-$v"
+
+          gh release view $tag --json tagName > $null 2>&1
+          $exists = $LASTEXITCODE -eq 0
+          $global:LASTEXITCODE = 0
+
+          if (-not $exists) {
+              $notes = @(
+                  "zlib $v built from the official source release with CMake + MSVC on a GitHub runner."
+                  ''
+                  'Each archive unpacks to a prefix containing bin\, lib\, include\ and a static\ view'
+                  'that exposes the static library under the name zlib.lib.'
+                  ''
+                  'Consumed by bucket/zlib.json in this repository.'
+              ) -join "`n"
+              gh release create $tag --title "zlib $v (MSVC binaries)" --notes $notes
+              if ($LASTEXITCODE -ne 0) { throw "gh release create failed for $tag" }
+          }
+
+          gh release upload $tag (Get-ChildItem zlib-*-msvc.zip | ForEach-Object FullName) --clobber
+          if ($LASTEXITCODE -ne 0) { throw "gh release upload failed for $tag" }
+
+      - name: Update manifest
+        if: steps.ver.outputs.skip != 'True'
+        shell: pwsh
+        run: |
+          $v    = '${{ steps.ver.outputs.version }}'
+          $base = "https://github.com/${{ github.repository }}/releases/download/zlib-$v"
+          $h64  = (Get-FileHash "zlib-$v-x64-msvc.zip" -Algorithm SHA256).Hash.ToLower()
+          $h86  = (Get-FileHash "zlib-$v-x86-msvc.zip" -Algorithm SHA256).Hash.ToLower()
+
+          $manifest = [ordered]@{
+              version     = $v
+              description = 'zlib compression library - prebuilt with MSVC. Ships shared + static libs and a LuaRocks-compatible static prefix.'
+              homepage    = 'https://zlib.net/'
+              license     = 'Zlib'
+              notes       = @(
+                  'Prebuilt on a GitHub runner from the official zlib source release - no CMake or MSVC needed to install this.',
+                  'See .github/workflows/build-zlib.yml in this repository for exactly how these binaries were produced.',
+                  '',
+                  'Layout:',
+                  '  bin\z.dll            shared runtime      (1.3.2 renamed this from zlib.dll)',
+                  '  lib\z.lib            IMPORT library for z.dll',
+                  '  lib\zs.lib           the real static library',
+                  '  include\zlib.h, zconf.h',
+                  '  static\lib\zlib.lib  copy of zs.lib under the name LuaRocks/autotools ask for',
+                  '  static\include\      copy of the headers',
+                  '',
+                  'Point CMake at the prefix itself (ZLIB_ROOT=<dir>).',
+                  'Point LuaRocks at the static view (ZLIB_DIR=<dir>\static) - that links the static',
+                  'library and needs no runtime DLL, which is what lua-zlib and zipwriter want.'
+              )
+              architecture = [ordered]@{
+                  '64bit' = [ordered]@{ url = "$base/zlib-$v-x64-msvc.zip"; hash = $h64 }
+                  '32bit' = [ordered]@{ url = "$base/zlib-$v-x86-msvc.zip"; hash = $h86 }
+              }
+              env_add_path = 'bin'
+              env_set      = [ordered]@{ ZLIB_ROOT = '$dir' }
+          }
+          $manifest | ConvertTo-Json -Depth 10 | Set-Content bucket/zlib.json -Encoding UTF8
+
+      - name: Normalise to Scoop canonical format
+        if: steps.ver.outputs.skip != 'True'
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+          Invoke-RestMethod get.scoop.sh -OutFile "$env:RUNNER_TEMP\install.ps1"
+          & "$env:RUNNER_TEMP\install.ps1" -RunAsAdmin
+          & "$env:USERPROFILE\scoop\apps\scoop\current\bin\formatjson.ps1" -Dir "$env:GITHUB_WORKSPACE\bucket"
+          Get-Content bucket/zlib.json
+
+      - name: Commit
+        if: steps.ver.outputs.skip != 'True'
+        shell: pwsh
+        run: |
+          if (-not (git status --porcelain -- bucket/zlib.json)) {
+              Write-Host 'Manifest already current.'
+              exit 0
+          }
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add bucket/zlib.json
+          git commit -m "zlib: publish prebuilt ${{ steps.ver.outputs.version }} and point the manifest at it"
+          git push

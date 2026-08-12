@@ -6,6 +6,11 @@ name: Excavator
 # openssl is pinned to the 3.5 LTS series by its own checkver script, so this
 # workflow will bump 3.5.7 -> 3.5.8 (security/patch releases) but will never
 # move it to 3.6.x or 4.x. That pin lives in bucket/openssl.json, not here.
+#
+# zlib is NOT handled here. checkver.ps1 only queues manifests that declare a
+# "checkver" key, and bucket/zlib.json deliberately has none: it ships prebuilt
+# binaries from our own releases, so build-zlib.yml owns that file end to end.
+# Giving zlib a checkver would make the two workflows fight over one manifest.
 
 on:
   schedule:
