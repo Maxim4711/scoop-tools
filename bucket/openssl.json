@@ -3,9 +3,7 @@
     "description": "TLS/SSL toolkit. Pinned to the 3.5 LTS series - only 3.5.x security/patch releases are ever picked up.",
     "homepage": "https://slproweb.com/products/Win32OpenSSL.html",
     "license": "Apache-2.0",
-    "notes": [
-        "Pinned to the OpenSSL 3.5 LTS series (supported until 2030-04-08): updates follow 3.5.x only, never 3.6.x or 4.x."
-    ],
+    "notes": "Pinned to the OpenSSL 3.5 LTS series (supported until 2030-04-08): updates follow 3.5.x only, never 3.6.x or 4.x.",
     "architecture": {
         "64bit": {
             "url": "https://slproweb.com/download/Win64OpenSSL-3_5_7.exe",
