@@ -4,13 +4,7 @@
     "homepage": "https://slproweb.com/products/Win32OpenSSL.html",
     "license": "Apache-2.0",
     "notes": [
-        "This manifest is deliberately pinned to the OpenSSL 3.5 LTS series (supported until 2030-04-08).",
-        "Excavator will move 3.5.7 -> 3.5.8 -> ... but will never jump to 3.6.x or 4.x.",
-        "To move to a different series you must edit checkver.script in this manifest on purpose.",
-        "",
-        "Import libraries live under lib\\VC\\<arch>\\MD (dynamic CRT) and lib\\VC\\<arch>\\MT (static CRT).",
-        "lib\\ contains hardlinks to the MT variant for CMake's FindOpenSSL.",
-        "Link MSVC /MD consumers (e.g. Lua C modules) against lib\\VC\\x64\\MD explicitly."
+        "Pinned to the OpenSSL 3.5 LTS series (supported until 2030-04-08): updates follow 3.5.x only, never 3.6.x or 4.x."
     ],
     "architecture": {
         "64bit": {

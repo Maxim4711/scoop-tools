@@ -1,6 +1,6 @@
 {
     "version": "1.3.2",
-    "description": "zlib compression library - prebuilt with MSVC. Ships shared + static libs and a LuaRocks-compatible static prefix.",
+    "description": "zlib compression library - prebuilt with MSVC. Ships shared + static libs, headers, and a static-only prefix.",
     "homepage": "https://zlib.net/",
     "license": "Zlib",
     "notes": [
@@ -12,12 +12,10 @@
         "  lib\\z.lib            IMPORT library for z.dll",
         "  lib\\zs.lib           the real static library",
         "  include\\zlib.h, zconf.h",
-        "  static\\lib\\zlib.lib  copy of zs.lib under the name LuaRocks/autotools ask for",
-        "  static\\include\\      copy of the headers",
+        "  static\\               the same static library and headers, named zlib.lib",
         "",
-        "Point CMake at the prefix itself (ZLIB_ROOT=<dir>).",
-        "Point LuaRocks at the static view (ZLIB_DIR=<dir>\\static) - that links the static",
-        "library and needs no runtime DLL, which is what lua-zlib and zipwriter want."
+        "Point CMake at the prefix itself (ZLIB_ROOT=<dir>); build systems that expect the",
+        "conventional zlib.lib name can use the static\\ view, which needs no runtime DLL."
     ],
     "architecture": {
         "64bit": {
