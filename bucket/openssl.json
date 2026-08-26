@@ -1,21 +1,21 @@
 {
-    "version": "3.5.7",
+    "version": "3.5.8",
     "description": "TLS/SSL toolkit. Pinned to the 3.5 LTS series - only 3.5.x security/patch releases are ever picked up.",
     "homepage": "https://slproweb.com/products/Win32OpenSSL.html",
     "license": "Apache-2.0",
     "notes": "Pinned to the OpenSSL 3.5 LTS series (supported until 2030-04-08): updates follow 3.5.x only, never 3.6.x or 4.x.",
     "architecture": {
         "64bit": {
-            "url": "https://slproweb.com/download/Win64OpenSSL-3_5_7.exe",
-            "hash": "c4e8ba59232ab56de5b86c063f34dbb5d4cb477833154c17a375d759d6cd3473"
+            "url": "https://slproweb.com/download/Win64OpenSSL-3_5_8.exe",
+            "hash": "0125ee1ea63bf288630161e75b60554b83e00c739441233f8f9703dc4a8f32f9"
         },
         "32bit": {
-            "url": "https://slproweb.com/download/Win32OpenSSL-3_5_7.exe",
-            "hash": "fb20b3b6ca0954b174a28fb7eecc80631c036824810a16f4eb4bc65b2309f480"
+            "url": "https://slproweb.com/download/Win32OpenSSL-3_5_8.exe",
+            "hash": "d55ddf392cb0ec31b3210fc9c6a9702a3c8cd95440ada96167226b6fc106f836"
         },
         "arm64": {
-            "url": "https://slproweb.com/download/Win64ARMOpenSSL-3_5_7.exe",
-            "hash": "7e05f7e83f4c183664a7d2b7405524edfceee790cb60f98bfe6307dae36182cc"
+            "url": "https://slproweb.com/download/Win64ARMOpenSSL-3_5_8.exe",
+            "hash": "2a51e2eca9834a78ea5123df6212f54ff84ee4658ed5af3d112900c5e45cd784"
         }
     },
     "innosetup": true,
