@@ -1,0 +1,59 @@
+{
+    "version": "0.2.1",
+    "description": "Fast local-first Markdown knowledge base with live preview, search, graph, Dataview, book reader and MCP server",
+    "homepage": "https://github.com/Freaction/Aquilum",
+    "license": "AGPL-3.0-only",
+    "notes": [
+        "Extracted from the vendor's NSIS setup, so this is a genuine portable install under the",
+        "Scoop apps directory - the setup is never executed, no elevation is required.",
+        "",
+        "Aquilum has a built-in updater. Decline its in-app update prompt and use `scoop update`",
+        "instead: accepting it runs the NSIS setup, which installs a second, unmanaged copy into",
+        "%LOCALAPPDATA%.",
+        "",
+        "Settings and caches live in %APPDATA%\\com.dmitriy.aquilum-app and",
+        "%LOCALAPPDATA%\\com.dmitriy.aquilum-app (outside Scoop's control): they survive updates and",
+        "`scoop uninstall` leaves them behind. Your notes stay in whatever vault folder you chose."
+    ],
+    "suggest": {
+        "WebView2": "extras/webview2"
+    },
+    "architecture": {
+        "64bit": {
+            "url": "https://github.com/Freaction/Aquilum/releases/download/v0.2.1/Aquilum_0.2.1_x64-setup.exe#/dl.7z",
+            "hash": "a4c67e04a53f52bc6513d151ca0cb4580015ec842f58812416a6ece54da20aa8"
+        }
+    },
+    "post_install": [
+        "# NSIS plumbing from the setup archive - not part of the app.",
+        "Remove-Item \"$dir\\`$PLUGINSDIR\", \"$dir\\uninstall.exe\" -Recurse -Force -ErrorAction SilentlyContinue"
+    ],
+    "bin": [
+        [
+            "aquilum-app.exe",
+            "aquilum"
+        ]
+    ],
+    "shortcuts": [
+        [
+            "aquilum-app.exe",
+            "Aquilum"
+        ]
+    ],
+    "pre_uninstall": [
+        "# A running instance holds aquilum-app.exe open; without this both",
+        "# `scoop update` and `scoop uninstall` fail with a file-in-use error.",
+        "Get-Process -Name 'aquilum-app' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue",
+        "Start-Sleep -Milliseconds 500"
+    ],
+    "checkver": {
+        "github": "https://github.com/Freaction/Aquilum"
+    },
+    "autoupdate": {
+        "architecture": {
+            "64bit": {
+                "url": "https://github.com/Freaction/Aquilum/releases/download/v$version/Aquilum_$version_x64-setup.exe#/dl.7z"
+            }
+        }
+    }
+}

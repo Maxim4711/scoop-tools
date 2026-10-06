@@ -5,7 +5,7 @@ public buckets are stale, wrong, or not pinned the way I need them.
 
 ```powershell
 scoop bucket add scoop-tools https://github.com/Maxim4711/scoop-tools
-scoop install scoop-tools/openssl scoop-tools/zlib scoop-tools/pyscripter scoop-tools/beetroot
+scoop install scoop-tools/openssl scoop-tools/zlib scoop-tools/pyscripter scoop-tools/beetroot scoop-tools/aquilum
 ```
 
 Three of these shadow a manifest of the same name in `main`, `extras` or
@@ -19,6 +19,7 @@ afterwards stays on this bucket by itself.
 | `zlib` | 1.3.2 | `extras` ships a **32-bit 1.2.12** binary from 2022. This ships 1.3.2 built with MSVC in CI. |
 | `pyscripter` | 5.3.1 | Same upstream as `scoop-apps`, with a fixed download host and persisted settings. |
 | `beetroot` | 1.6.6 | The vendor's manifest runs an NSIS setup that installs into `%ProgramFiles%`. This one is a real portable install. |
+| `aquilum` | 0.2.1 | Not in any public bucket. Portable install unpacked from the vendor's NSIS setup. |
 
 ## openssl — pinned to 3.5 LTS
 
@@ -130,11 +131,31 @@ installer* from the install script. Problems with that, all fixed here:
 `%APPDATA%\Beetroot` (database and settings) is outside Scoop's control: it
 survives updates and is intentionally left behind on uninstall.
 
+## aquilum — portable, from the NSIS setup
+
+[Aquilum](https://github.com/Freaction/Aquilum) (local-first Markdown knowledge
+base, Tauri) only publishes an NSIS `setup.exe` — there is no MSI to extract as
+with beetroot. The setup is a plain NSIS-3 archive, so the URL carries `#/dl.7z`
+and Scoop unpacks it with 7-Zip: the payload is a single `aquilum-app.exe`, and
+`post_install` drops the NSIS leftovers (`$PLUGINSDIR`, `uninstall.exe`). The
+setup is never run, nothing lands in `%LOCALAPPDATA%\Aquilum`, no elevation.
+
+* `bin` exposes it as `aquilum` on `PATH` — handy for its local MCP server
+  (`aquilum --mcp`, stdio).
+* `pre_uninstall` stops a running instance so `scoop update` does not hit a
+  file-in-use error.
+* **Decline the in-app update prompt.** Aquilum embeds the Tauri updater, which
+  would download and *run* the NSIS setup and leave a second, unmanaged copy
+  beside the Scoop one. Excavator picks up new releases instead.
+* Settings and WebView2 caches live in `%APPDATA%` / `%LOCALAPPDATA%` under
+  `com.dmitriy.aquilum-app` and survive uninstall; the notes themselves stay in
+  whatever vault folder you opened.
+
 ## Automation
 
 * **`.github/workflows/excavator.yml`** — daily; runs Scoop's `checkver.ps1 -Update`
   over `bucket/` and commits version + hash bumps. Also runnable on demand for a
-  single app via *Run workflow*. Covers `openssl`, `pyscripter` and `beetroot`.
+  single app via *Run workflow*. Covers `openssl`, `pyscripter`, `beetroot` and `aquilum`.
 * **`.github/workflows/build-zlib.yml`** — weekly and on demand; builds zlib,
   publishes the release, and updates `bucket/zlib.json` itself. Takes an optional
   `version` (blank = latest upstream) and a `force` flag to rebuild an existing
@@ -146,4 +167,4 @@ survives updates and is intentionally left behind on uninstall.
 ## Licence
 
 Manifests are MIT (see `LICENSE`). The packaged software keeps its own licence —
-notably **beetroot is proprietary**; this bucket only describes where to get it.
+notably **beetroot is proprietary** and **aquilum is AGPL-3.0-only**; this bucket only describes where to get it.
