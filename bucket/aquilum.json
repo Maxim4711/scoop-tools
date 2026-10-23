@@ -1,5 +1,5 @@
 {
-    "version": "0.3.14",
+    "version": "0.3.15",
     "description": "Fast local-first Markdown knowledge base with live preview, search, graph, Dataview, book reader and MCP server",
     "homepage": "https://github.com/Freaction/Aquilum",
     "license": "AGPL-3.0-only",
@@ -20,8 +20,8 @@
     },
     "architecture": {
         "64bit": {
-            "url": "https://github.com/Freaction/Aquilum/releases/download/v0.3.14/Aquilum_0.3.14_x64-setup.exe#/dl.7z",
-            "hash": "4f37e0d7ae3957f8c9f03ff8d3b4326b4ff060c344b4c4d9b44f60c652acb02a"
+            "url": "https://github.com/Freaction/Aquilum/releases/download/v0.3.15/Aquilum_0.3.15_x64-setup.exe#/dl.7z",
+            "hash": "9c0157f62d80e5ce63e4b5350b6693106553517eacdbd2a4bc07be6834790465"
         }
     },
     "post_install": [
