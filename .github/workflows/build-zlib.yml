@@ -90,14 +90,20 @@ jobs:
               if ($LASTEXITCODE -ne 0) { throw "build failed for $($a.name)" }
 
               # Static view: LuaRocks (and autotools-flavoured build systems) look
-              # for a file literally named zlib.lib. Since 1.3.2 the static library
-              # is called zs.lib, so expose a copy under the expected name - kept
-              # out of lib\ so an import library and a static library never share
-              # the name zlib.lib in one directory.
-              if (-not (Test-Path "$pfx\lib\zs.lib")) { throw "expected lib\zs.lib (static) for $($a.name)" }
+              # for a file literally named zlib.lib. Upstream keeps renaming the
+              # MSVC outputs (1.3.2: z.dll/z.lib/zs.lib, 1.4: libz.dll/libz.lib/
+              # libzs.lib), so find the static library under any known name and
+              # expose a copy as zlib.lib - kept out of lib\ so an import library
+              # and a static library never share the name zlib.lib in one directory.
+              $static = @('libzs.lib', 'zs.lib', 'zlibstatic.lib') |
+                        Where-Object { Test-Path "$pfx\lib\$_" } | Select-Object -First 1
+              if (-not $static) {
+                  throw "no static zlib library in lib\ for $($a.name): $((Get-ChildItem "$pfx\lib" -Filter *.lib).Name -join ', ')"
+              }
               New-Item -ItemType Directory -Force "$pfx\static\lib", "$pfx\static\include" | Out-Null
-              Copy-Item "$pfx\include\*.h" "$pfx\static\include\" -Force
-              Copy-Item "$pfx\lib\zs.lib"  "$pfx\static\lib\zlib.lib" -Force
+              Copy-Item "$pfx\include\*.h"     "$pfx\static\include\" -Force
+              Copy-Item "$pfx\lib\$static"     "$pfx\static\lib\zlib.lib" -Force
+              Write-Host "$($a.name): static library is lib\$static"
 
               Compress-Archive -Path "$pfx\*" -DestinationPath "$PWD\zlib-$v-$($a.name)-msvc.zip" -Force
           }
@@ -141,6 +147,15 @@ jobs:
           $h64  = (Get-FileHash "zlib-$v-x64-msvc.zip" -Algorithm SHA256).Hash.ToLower()
           $h86  = (Get-FileHash "zlib-$v-x86-msvc.zip" -Algorithm SHA256).Hash.ToLower()
 
+          # Describe the layout from what was actually built - the output names
+          # change between zlib releases.
+          $pfx    = "$PWD\prefix-x64"
+          $dll    = (Get-ChildItem "$pfx\bin" -Filter *.dll | Select-Object -First 1).Name
+          $static = @('libzs.lib', 'zs.lib', 'zlibstatic.lib') |
+                    Where-Object { Test-Path "$pfx\lib\$_" } | Select-Object -First 1
+          $import = (Get-ChildItem "$pfx\lib" -Filter *.lib | Where-Object Name -ne $static | Select-Object -First 1).Name
+          if (-not ($dll -and $static -and $import)) { throw "unexpected install layout: dll=$dll import=$import static=$static" }
+
           $manifest = [ordered]@{
               version     = $v
               description = 'zlib compression library - prebuilt with MSVC. Ships shared + static libs and a LuaRocks-compatible static prefix.'
@@ -151,11 +166,11 @@ jobs:
                   'See .github/workflows/build-zlib.yml in this repository for exactly how these binaries were produced.',
                   '',
                   'Layout:',
-                  '  bin\z.dll            shared runtime      (1.3.2 renamed this from zlib.dll)',
-                  '  lib\z.lib            IMPORT library for z.dll',
-                  '  lib\zs.lib           the real static library',
+                  ('  {0,-20} shared runtime' -f "bin\$dll"),
+                  ('  {0,-20} IMPORT library for {1}' -f "lib\$import", $dll),
+                  ('  {0,-20} the real static library' -f "lib\$static"),
                   '  include\zlib.h, zconf.h',
-                  '  static\lib\zlib.lib  copy of zs.lib under the name LuaRocks/autotools ask for',
+                  "  static\lib\zlib.lib  copy of $static under the name LuaRocks/autotools ask for",
                   '  static\include\      copy of the headers',
                   '',
                   'Point CMake at the prefix itself (ZLIB_ROOT=<dir>).',

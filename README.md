@@ -81,23 +81,27 @@ one, so excavator skips zlib and the two jobs cannot race over the same file.
 Only `x64` and `x86` are published; the source-build revision would compile for
 whatever architecture Scoop picked, so `arm64` is a deliberate drop.
 
-**1.3.2 renamed its Windows outputs** — worth knowing if you are migrating:
+**Upstream keeps renaming the MSVC outputs.** This is worth knowing if you are migrating:
 
-| | 1.3.1 | 1.3.2 |
-|---|---|---|
-| shared runtime | `zlib.dll` | `z.dll` |
-| import library | `zlib.lib` | `z.lib` |
-| static library | `zlibstatic.lib` | `zs.lib` |
+| | 1.3.1 | 1.3.2 | 1.4 |
+|---|---|---|---|
+| shared runtime | `zlib.dll` | `z.dll` | `libz.dll` |
+| import library | `zlib.lib` | `z.lib` | `libz.lib` |
+| static library | `zlibstatic.lib` | `zs.lib` | `libzs.lib` |
 
-That rename incidentally kills a real trap: `zlib.dll` used to collide with the
-Lua binding of the same name and shadow it on `package.cpath`. `z.dll` cannot.
+The workflow finds the static library under any of these names, and the manifest
+notes are generated from whatever was actually built.
+
+Dropping the `zlib.dll` name removed a real trap: it used to collide with the Lua
+binding of the same name and shadow it on `package.cpath`. Neither `z.dll` nor
+`libz.dll` can do that.
 
 Because LuaRocks (and plenty of autotools-flavoured build systems) insist on
 finding `zlib.lib`, the manifest also lays down a **static view**:
 
 ```
 <dir>\static\include\zlib.h, zconf.h
-<dir>\static\lib\zlib.lib      <- a copy of zs.lib, i.e. the STATIC library
+<dir>\static\lib\zlib.lib      <- a copy of the STATIC library (libzs.lib / zs.lib)
 ```
 
 Point LuaRocks at `ZLIB_DIR=<dir>\static` and it links statically with no runtime
